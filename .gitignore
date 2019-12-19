@@ -12,3 +12,6 @@ venv
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+.idea/
+projects/02_trivia_api/progetti_corso/
