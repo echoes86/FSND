@@ -3,10 +3,14 @@ from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import random
+import logging
+from logging import Formatter, FileHandler
+
+
 
 from models import setup_db, Question, Category
 
-QUESTIONS_PER_PAGE = 10
+QUESTIONS_PER_PAGE = 5
 
 
 def create_app(test_config=None):
@@ -34,6 +38,15 @@ def create_app(test_config=None):
 
         return response
 
+    file_handler = FileHandler('error.log')
+    file_handler.setFormatter(
+        Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
+    )
+    app.logger.setLevel(logging.INFO)
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.info('errors')
+
     '''
     @TODO: 
     Create an endpoint to handle GET requests 
@@ -46,9 +59,7 @@ def create_app(test_config=None):
             page = 1
 
         start = (int(page) - 1) * QUESTIONS_PER_PAGE
-        print(start)
         end = start + QUESTIONS_PER_PAGE
-        print(end)
 
         if start > len(item_list):
             abort(422) # Unprocessable Entity
@@ -57,17 +68,19 @@ def create_app(test_config=None):
 
     @app.route('/categories')
     def get_categories():
-        all_categories = [item.format() for item in Category.query.all()]
-        return jsonify(all_categories)
+        all_categories_dict = {item.id: item.type  for item in Category.query.all()}
+        return jsonify({
+            'categories': all_categories_dict
+        })
 
     @app.route('/categories/<int:category_id>/questions')
     def get_category(category_id):
-        single_category = Category.query.filter_by(Category.id == category_id).one_or_none()
+        single_category = Category.query.filter(Category.id == category_id).one_or_none()
 
         if single_category is None:
             abort(404)
 
-        questions_per_category = Question.query.filter_by(Question.category == single_category.id).all()
+        questions_per_category = Question.query.filter(Question.category == single_category.id).all()
 
         return jsonify(
             {
@@ -93,15 +106,14 @@ def create_app(test_config=None):
     @app.route('/questions', methods=['GET'])
     def get_questions_paginated():
         all_questions = [item.format() for item in Question.query.all()]
-        all_categories = [item.format() for item in Category.query.all()]
+        all_categories_dict = {item.id: item.type  for item in Category.query.all()}
         paginated_questions = _paginated_list(request, all_questions)
 
         return jsonify(
             {
                 'questions': paginated_questions,
                 'total_questions': len(all_questions),
-                'categories': all_categories,
-                'current_category': {'id': 1, 'type': 'prova'}
+                'categories': all_categories_dict
             }
         )
 
@@ -112,6 +124,21 @@ def create_app(test_config=None):
     TEST: When you click the trash icon next to a question, the question will be removed.
     This removal will persist in the database and when you refresh the page. 
     '''
+    @app.route('/questions/<int:question_id>', methods=['DELETE'])
+    def delete_question(question_id):
+        deleting_question = Question.query.filter(Question.id == question_id).one_or_none()
+
+        if delete_question is None:
+            abort(404)
+
+        deleting_question.delete()
+        return jsonify(
+            {
+                'success': True,
+                'question': deleting_question.id,
+                'error': False
+            }
+        )
 
     '''
     @TODO: 
@@ -123,6 +150,19 @@ def create_app(test_config=None):
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.  
     '''
+    def _post_new_question(request):
+        request_body_dict = request.get_json()
+
+        new_question = Question(**request_body_dict)
+        new_question.insert()
+
+        return jsonify(
+            {
+                'success': True,
+                'question': new_question.id,
+                'error': False
+            }
+        )
 
     '''
     @TODO: 
@@ -134,6 +174,17 @@ def create_app(test_config=None):
     only question that include that string within their question. 
     Try using the word "title" to start. 
     '''
+    @app.route('/questions', methods=['POST'])
+    def manage_question_post():
+        try:
+            request_dict = request.get_json()
+            app.logger.info(request_dict)
+            if request_dict.get('searchTerm'):
+                _search_question(request)
+            else:
+                _post_new_question(request)
+        except:
+            abort(400)
 
     '''
     @TODO: 
@@ -143,6 +194,17 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that 
     category to be shown. 
     '''
+    def _search_question(request):
+        found_questions = Question.query.filter(Question.question.ilike('%{}%'.format(request.get_json('searchTerm')))).all()
+        app.logger.info(found_questions)
+
+        return jsonify(
+            {
+                'questions': [item.format() for item in found_questions],
+                'total_questions': len(found_questions),
+                'current_category': {'ciao'}
+            }
+        )
 
     '''
     @TODO: 
