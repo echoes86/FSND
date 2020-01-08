@@ -6,8 +6,6 @@ import random
 import logging
 from logging import Formatter, FileHandler
 
-
-
 from models import setup_db, Question, Category
 
 QUESTIONS_PER_PAGE = 5
@@ -45,7 +43,6 @@ def create_app(test_config=None):
     app.logger.setLevel(logging.INFO)
     file_handler.setLevel(logging.INFO)
     app.logger.addHandler(file_handler)
-    app.logger.info('errors')
 
     '''
     @TODO: 
@@ -53,18 +50,21 @@ def create_app(test_config=None):
     for all available categories.
     '''
     def _paginated_list(request, item_list):
-        page = request.args.get('page', None)
+        try:
+            page = request.args.get('page', None)
+        except Exception as exc:
+            abort(400)  # Bad Request
+        else:
+            if page is None:
+                page = 1
 
-        if page is None:
-            page = 1
+            start = (int(page) - 1) * QUESTIONS_PER_PAGE
+            end = start + QUESTIONS_PER_PAGE
 
-        start = (int(page) - 1) * QUESTIONS_PER_PAGE
-        end = start + QUESTIONS_PER_PAGE
+            if start > len(item_list):
+                abort(422) # Unprocessable Entity
 
-        if start > len(item_list):
-            abort(422) # Unprocessable Entity
-
-        return item_list[start:end]
+            return item_list[start:end]
 
     @app.route('/categories')
     def get_categories():
@@ -78,9 +78,9 @@ def create_app(test_config=None):
         single_category = Category.query.filter(Category.id == category_id).one_or_none()
 
         if single_category is None:
-            abort(404)
+            abort(404) # Not Found
 
-        questions_per_category = Question.query.filter(Question.category == single_category.id).all()
+        questions_per_category = Question.query.filter(Question.category == single_category.id).all() or []
 
         return jsonify(
             {
@@ -129,7 +129,7 @@ def create_app(test_config=None):
         deleting_question = Question.query.filter(Question.id == question_id).one_or_none()
 
         if delete_question is None:
-            abort(404)
+            abort(404) # Not Found
 
         deleting_question.delete()
         return jsonify(
@@ -151,18 +151,29 @@ def create_app(test_config=None):
     of the questions list in the "List" tab.  
     '''
     def _post_new_question(request):
-        request_body_dict = request.get_json()
+        try:
+            request_body_dict = request.get_json()
+            app.logger.info(request_body_dict)
 
-        new_question = Question(**request_body_dict)
-        new_question.insert()
+            new_question = Question(
+                question=request_body_dict.get('question'),
+                answer=request_body_dict.get('answer'),
+                category=request_body_dict.get('category'),
+                difficulty=request_body_dict.get('difficulty')
+            )
+            app.logger.info('DONE!!!')
 
-        return jsonify(
-            {
-                'success': True,
-                'question': new_question.id,
-                'error': False
-            }
-        )
+            new_question.insert()
+            app.logger.info('INSERTED!!! ' + str(new_question.id))
+
+            return \
+                {
+                    'success': True,
+                    'question': new_question.id,
+                    'error': False
+                }
+        except Exception as exc:
+            abort(400)  # Bad Request
 
     '''
     @TODO: 
@@ -178,11 +189,18 @@ def create_app(test_config=None):
     def manage_question_post():
         try:
             request_dict = request.get_json()
+            response_dict = {}
             app.logger.info(request_dict)
-            if request_dict.get('searchTerm'):
-                _search_question(request)
+
+            if request_dict.get('searchTerm', None):
+                app.logger.info('searching question')
+                response_dict = _search_question(request)
             else:
-                _post_new_question(request)
+                app.logger.info('posting question')
+                response_dict = _post_new_question(request)
+
+            app.logger.info('RESPONSE DICT: ' + str(response_dict))
+            return jsonify(response_dict)
         except:
             abort(400)
 
@@ -195,16 +213,14 @@ def create_app(test_config=None):
     category to be shown. 
     '''
     def _search_question(request):
-        found_questions = Question.query.filter(Question.question.ilike('%{}%'.format(request.get_json('searchTerm')))).all()
-        app.logger.info(found_questions)
+        found_questions = Question.query.filter(Question.question.ilike('%{}%'.format(request.get_json().get('searchTerm')))).all()
 
-        return jsonify(
+        return \
             {
                 'questions': [item.format() for item in found_questions],
                 'total_questions': len(found_questions),
-                'current_category': {'ciao'}
+                'current_category': request.get_json().get('category', {})
             }
-        )
 
     '''
     @TODO: 
@@ -217,6 +233,43 @@ def create_app(test_config=None):
     one question at a time is displayed, the user is allowed to answer
     and shown whether they were correct or not. 
     '''
+    @app.route('/quizzes', methods=['POST'])
+    def post_quiz():
+        try:
+            quiz_dict = request.get_json()
+            quiz_category = quiz_dict.get('quiz_category').get('id')
+        except Exception as exc:
+            abort(400)  # Bad Request
+
+        previous_questions = quiz_dict.get('previous_questions', None)
+
+        if previous_questions:
+            app.logger.info('PREVIOUS QUESTIONS: {}'.format(str(previous_questions)))
+        app.logger.info('ACTUAL CATEGORY: ' + str(quiz_category))
+
+        if quiz_category == 0:
+            all_questions = Question.query.all()
+        else:
+            all_questions = Question.query.filter(Question.category == quiz_category).all()
+
+        app.logger.info('ALL QUESTIONS: ' + str(all_questions))
+        actual_question = all_questions[random.randint(0, (len(all_questions) - 1))]
+        app.logger.info('ACTUAL QUESTION: ' + str(actual_question.question))
+
+        return jsonify(
+            {
+                'question':
+                    {
+                        'question': actual_question.question,
+                        'id': actual_question.id,
+                        'answer': actual_question.answer,
+                        'difficulty': actual_question.difficulty,
+                        'category': actual_question.category
+                    },
+                'success': True,
+                'error': False
+            }
+        )
 
     '''
     @TODO: 

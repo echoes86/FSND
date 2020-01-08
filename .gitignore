@@ -14,4 +14,6 @@ ehthumbs.db
 Thumbs.db
 
 .idea/
-projects/02_trivia_api/progetti_corso/
+projects/02_trivia_api/starter/progetti_corso/
+projects/02_trivia_api/starter/frontend/node_modules
+projects/02_trivia_api/starter/backend/error.log
