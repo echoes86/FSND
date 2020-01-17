@@ -1,6 +1,9 @@
 .vscode
 __pycache__
 venv
+frontend/node_modules
+backend/flaskr/error.log
+trivia.zip
 
 # OS generated files #
 ######################

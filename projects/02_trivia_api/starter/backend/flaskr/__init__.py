@@ -36,13 +36,13 @@ def create_app(test_config=None):
 
         return response
 
-    file_handler = FileHandler('error.log')
-    file_handler.setFormatter(
-        Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
-    )
-    app.logger.setLevel(logging.INFO)
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
+    # file_handler = FileHandler('error.log')
+    # file_handler.setFormatter(
+    #     Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
+    # )
+    # app.logger.setLevel(logging.INFO)
+    # file_handler.setLevel(logging.INFO)
+    # app.logger.addHandler(file_handler)
 
     '''
     @TODO: 
@@ -68,8 +68,10 @@ def create_app(test_config=None):
 
     @app.route('/categories')
     def get_categories():
-        all_categories_dict = {item.id: item.type  for item in Category.query.all()}
+        all_categories_dict = {item.id: item.type for item in Category.query.all()}
         return jsonify({
+            'success': True,
+            'error': False,
             'categories': all_categories_dict
         })
 
@@ -84,8 +86,10 @@ def create_app(test_config=None):
 
         return jsonify(
             {
+                'success': True,
+                'error': False,
                 'questions': [item.format() for item in questions_per_category],
-                'total_quesitons': len(questions_per_category),
+                'total_questions': len(questions_per_category),
                 'current_category': single_category.type
             }
         )
@@ -111,6 +115,8 @@ def create_app(test_config=None):
 
         return jsonify(
             {
+                'success': True,
+                'error': False,
                 'questions': paginated_questions,
                 'total_questions': len(all_questions),
                 'categories': all_categories_dict
@@ -128,7 +134,7 @@ def create_app(test_config=None):
     def delete_question(question_id):
         deleting_question = Question.query.filter(Question.id == question_id).one_or_none()
 
-        if delete_question is None:
+        if deleting_question is None:
             abort(404) # Not Found
 
         deleting_question.delete()
@@ -153,7 +159,7 @@ def create_app(test_config=None):
     def _post_new_question(request):
         try:
             request_body_dict = request.get_json()
-            app.logger.info(request_body_dict)
+            #app.logger.info('REQUESTBODY: ' + str(request_body_dict))
 
             new_question = Question(
                 question=request_body_dict.get('question'),
@@ -161,10 +167,10 @@ def create_app(test_config=None):
                 category=request_body_dict.get('category'),
                 difficulty=request_body_dict.get('difficulty')
             )
-            app.logger.info('DONE!!!')
+            #app.logger.info('DONE!!!')
 
             new_question.insert()
-            app.logger.info('INSERTED!!! ' + str(new_question.id))
+            #app.logger.info('INSERTED!!! ' + str(new_question.id))
 
             return \
                 {
@@ -190,16 +196,15 @@ def create_app(test_config=None):
         try:
             request_dict = request.get_json()
             response_dict = {}
-            app.logger.info(request_dict)
 
             if request_dict.get('searchTerm', None):
-                app.logger.info('searching question')
+                #app.logger.info('searching question')
                 response_dict = _search_question(request)
             else:
-                app.logger.info('posting question')
+                #app.logger.info('posting question')
                 response_dict = _post_new_question(request)
 
-            app.logger.info('RESPONSE DICT: ' + str(response_dict))
+            #app.logger.info('RESPONSE DICT: ' + str(response_dict))
             return jsonify(response_dict)
         except:
             abort(400)
@@ -217,6 +222,8 @@ def create_app(test_config=None):
 
         return \
             {
+                'success': True,
+                'error': False,
                 'questions': [item.format() for item in found_questions],
                 'total_questions': len(found_questions),
                 'current_category': request.get_json().get('category', {})
@@ -237,24 +244,23 @@ def create_app(test_config=None):
     def post_quiz():
         try:
             quiz_dict = request.get_json()
+            #app.logger.info('REQUESTBODY: ' + str(quiz_dict))
             quiz_category = quiz_dict.get('quiz_category').get('id')
         except Exception as exc:
             abort(400)  # Bad Request
 
         previous_questions = quiz_dict.get('previous_questions', None)
 
-        if previous_questions:
-            app.logger.info('PREVIOUS QUESTIONS: {}'.format(str(previous_questions)))
-        app.logger.info('ACTUAL CATEGORY: ' + str(quiz_category))
+        # if previous_questions:
+        #     #app.logger.info('PREVIOUS QUESTIONS: {}'.format(str(previous_questions)))
+        # #app.logger.info('ACTUAL CATEGORY: ' + str(quiz_category))
 
         if quiz_category == 0:
             all_questions = Question.query.all()
         else:
             all_questions = Question.query.filter(Question.category == quiz_category).all()
 
-        app.logger.info('ALL QUESTIONS: ' + str(all_questions))
         actual_question = all_questions[random.randint(0, (len(all_questions) - 1))]
-        app.logger.info('ACTUAL QUESTION: ' + str(actual_question.question))
 
         return jsonify(
             {
@@ -276,5 +282,37 @@ def create_app(test_config=None):
     Create error handlers for all expected errors 
     including 404 and 422. 
     '''
+    @app.errorhandler(400)
+    def bad_request(error):
+        return jsonify({
+            "success": False,
+            "error": 400,
+            "message": "Bad Request"
+        }), 400
+
+    @app.errorhandler(422)
+    def unprocessable_entity(error):
+        return jsonify({
+            "success": False,
+            "error": 422,
+            "message": "Unprocessable Entity"
+        }), 422
+
+    @app.errorhandler(404)
+    def not_found(error):
+        return jsonify({
+            "success": False,
+            "error": 404,
+            "message": "Not found"
+        }), 404
+
+    @app.errorhandler(500)
+    def not_found(error):
+        return jsonify({
+            "success": False,
+            "error": 500,
+            "message": "Internal Server Error"
+        }), 500
+
 
     return app
