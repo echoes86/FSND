@@ -1,6 +1,6 @@
 .vscode
 __pycache__
-venv
+venv/
 
 # OS generated files #
 ######################
@@ -13,6 +13,6 @@ ehthumbs.db
 Thumbs.db
 
 .idea/
-projects/02_trivia_api/starter/progetti_corso/
-projects/02_trivia_api/starter/frontend/node_modules
-projects/02_trivia_api/starter/backend/error.log
+progetti_corso/
+frontend/node_modules
+backend/error.log
