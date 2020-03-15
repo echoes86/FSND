@@ -46,12 +46,14 @@ def get_drinks_short():
 @requires_auth('get:drinks-detail')
 @app.route('/drinks-detail', methods=['GET'])
 def get_drings_long():
-    all_drinks = [single_drink.short() for single_drink in Drink.query.all()]
-    return jsonify({
-        'success': True,
-        'drinks': all_drinks
-    })
-
+    try:
+        all_drinks = [single_drink.short() for single_drink in Drink.query.all()]
+        return jsonify({
+            'success': True,
+            'drinks': all_drinks
+        })
+    except:
+        abort(500)
 
 '''
 @TODO implement endpoint
@@ -65,22 +67,14 @@ def get_drings_long():
 @requires_auth('post:drinks')
 @app.route('/drinks', methods=['POST'])
 def post_drink():
-    print('sono qui')
     try:
         request_body_dict = request.get_json()
-        print('REQUESTBODY: ' + str(request_body_dict))
-        print('TITOLO tipo: {}'.format(str(type(request_body_dict.get('title')))))
-        print(
-            'RECIPE tipo: {}'.format(json.dumps(request_body_dict.get('recipe'))))
-
         new_drink = Drink(
             title=request_body_dict.get('title'),
             recipe=json.dumps(request_body_dict.get('recipe'))
         )
-        print('DONE!!!')
 
         new_drink.insert()
-        print('INSERTED!!! ' + str(new_drink))
 
         return jsonify(
             {
@@ -88,7 +82,6 @@ def post_drink():
                 'drinks': [new_drink.long()]
             })
     except Exception as exc:
-        print(exc.args)
         abort(400)  # Bad Request
 
 
@@ -108,10 +101,8 @@ def post_drink():
 def patch_drink(id):
     try:
         request_body_dict = request.get_json()
-        print('REQUESTBODY: ' + str(request_body_dict))
         patching_drink = Drink.query.filter(Drink.id == id).one_or_none()
 
-        print('Elemento trovato!')
         if not patching_drink:
             abort(404)
 
@@ -124,15 +115,12 @@ def patch_drink(id):
 
         patching_drink.update()
 
-        # app.logger.info('PATCHED!!! ' + str(new_question.id))
-
         return jsonify(
             {
                 'success': True,
                 'drinks': [patching_drink.long()]
             })
     except Exception as exc:
-        print(exc.args)
         abort(400)  # Bad Request
 
 
@@ -156,8 +144,6 @@ def delete_drink(id):
             abort(404)
 
         deleting_drink.delete()
-
-        # app.logger.info('PATCHED!!! ' + str(new_question.id))
 
         return jsonify(
             {
@@ -222,3 +208,11 @@ def bad_request(error):
         "error": 400,
         "message": "Bad Request"
     }), 400
+
+@app.errorhandler(500)
+def resource_not_found(error):
+    return jsonify({
+                    "success": False,
+                    "error": 500,
+                    "message": "internal server error"
+                    }), 500
