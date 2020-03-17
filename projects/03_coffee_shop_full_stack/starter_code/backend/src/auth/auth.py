@@ -7,7 +7,7 @@ from urllib.request import urlopen
 
 AUTH0_DOMAIN = 'simoennova.eu.auth0.com'
 ALGORITHMS = ['RS256']
-API_AUDIENCE = 'coffeapi'
+API_AUDIENCE = 'coffeeapi'
 
 ## AuthError Exception
 '''
@@ -86,8 +86,8 @@ def check_permissions(permission, payload):
     # Check wether 'payload.permissions' contains the specific permission
     if permission not in payload['permissions']:
         raise AuthError({
-            'code': 'permissions not found in payload',
-            'description': 'Authorization malformed.'
+            'code': 'permission does not allow this operation',
+            'description': 'Authorization not granted.'
         }, 403)
     return True
 
@@ -107,12 +107,10 @@ def check_permissions(permission, payload):
 def verify_decode_jwt(token):
     # GET THE PUBLIC KEY FROM AUTH0
     jsonurl = urlopen(f'https://{AUTH0_DOMAIN}/.well-known/jwks.json')
-    print('JSONURL: ' + str(jsonurl))
     jwks = json.loads(jsonurl.read())
 
     # GET THE DATA IN THE HEADER
     unverified_header = jwt.get_unverified_header(token)
-    print('unverified_header: ' + str(unverified_header))
 
     # CHOOSE OUR KEY
     rsa_key = {}
@@ -141,9 +139,19 @@ def verify_decode_jwt(token):
                 rsa_key,
                 algorithms=ALGORITHMS,
                 audience=API_AUDIENCE,
-                issuer='https://' + AUTH0_DOMAIN + '/'
+                issuer='https://' + AUTH0_DOMAIN + '/',
+                options={
+                'verify_signature': True,
+                'verify_aud': True,
+                'verify_iat': True,
+                'verify_exp': True,
+                'verify_nbf': True,
+                'verify_iss': True,
+                'verify_sub': True,
+                'verify_jti': True,
+                'leeway': 0,
+            }
             )
-
             return payload
 
         except jwt.ExpiredSignatureError:
@@ -188,8 +196,8 @@ def requires_auth(permission=''):
                 token = get_token_auth_header()
                 payload = verify_decode_jwt(token)
             except:
-                abort(401)
+                raise
             check_permissions(permission, payload)
-            return f(payload, *args, **kwargs)
+            return f(*args, **kwargs)
         return wrapper
     return requires_auth_decorator
