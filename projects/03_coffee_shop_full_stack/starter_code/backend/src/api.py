@@ -45,7 +45,7 @@ def get_drinks_short():
 '''
 @app.route('/drinks-detail', methods=['GET'])
 @requires_auth('get:drinks-detail')
-def get_drings_long():
+def get_drinks_long():
     try:
         all_drinks = [single_drink.short() for single_drink in Drink.query.all()]
         return jsonify({
@@ -216,3 +216,23 @@ def resource_not_found(error):
                     "error": 500,
                     "message": "internal server error"
                     }), 500
+
+@app.errorhandler(AuthError)
+def auth_exception_handler(e: AuthError):
+    # Handles all Authorization exceptions
+    response = jsonify({
+                    "success": False,
+                    "error": e.status_code,
+                    "message": e.error
+                    }), e.status_code
+    return response
+
+@app.errorhandler(Exception)
+def exception_handler(e: Exception):
+    # Handles all exceptions that happen and are not correctly handled
+    response = jsonify({
+                    "success": False,
+                    "error": 500,
+                    "message": e.args
+                    }), 500
+    return response
